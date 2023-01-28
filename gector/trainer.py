@@ -12,9 +12,9 @@ import torch.optim.lr_scheduler
 from allennlp.common import Params
 from allennlp.common.checks import ConfigurationError, parse_cuda_device
 from allennlp.common.tqdm import Tqdm
-from allennlp.common.util import dump_metrics, gpu_memory_mb, peak_memory_mb, lazy_groups_of
+from allennlp.common.util import dump_metrics, lazy_groups_of #, gpu_memory_mb, peak_memory_mb
 from allennlp.data.instance import Instance
-from allennlp.data.iterators.data_iterator import DataIterator, TensorDict
+from allennlp.data.data_loaders import TensorDict
 from allennlp.models.model import Model
 from allennlp.nn import util as nn_util
 from allennlp.training import util as training_util
@@ -24,8 +24,10 @@ from allennlp.training.metric_tracker import MetricTracker
 from allennlp.training.momentum_schedulers import MomentumScheduler
 from allennlp.training.moving_average import MovingAverage
 from allennlp.training.optimizers import Optimizer
-from allennlp.training.tensorboard_writer import TensorboardWriter
-from allennlp.training.trainer_base import TrainerBase
+from allennlp.training.callbacks import TensorBoardCallback
+from allennlp.training import Trainer as TrainerBase
+from allennlp.data import DataLoader
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +38,12 @@ class Trainer(TrainerBase):
         model: Model,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
-        iterator: DataIterator,
+        iterator: DataLoader,
         train_dataset: Iterable[Instance],
         validation_dataset: Optional[Iterable[Instance]] = None,
         patience: Optional[int] = None,
         validation_metric: str = "-loss",
-        validation_iterator: DataIterator = None,
+        validation_iterator: DataLoader = None,
         shuffle: bool = True,
         num_epochs: int = 20,
         accumulated_batch_count: int = 1,
@@ -244,7 +246,7 @@ class Trainer(TrainerBase):
         # ``_enable_activation_logging``.
         self._batch_num_total = 0
 
-        self._tensorboard = TensorboardWriter(
+        self._tensorboard = TensorBoardCallback(
             get_batch_num_total=lambda: self._batch_num_total,
             serialization_dir=serialization_dir,
             summary_interval=summary_interval,
@@ -296,12 +298,12 @@ class Trainer(TrainerBase):
         Trains one epoch and returns metrics.
         """
         logger.info("Epoch %d/%d", epoch, self._num_epochs - 1)
-        peak_cpu_usage = peak_memory_mb()
-        logger.info(f"Peak CPU memory usage MB: {peak_cpu_usage}")
-        gpu_usage = []
-        for gpu, memory in gpu_memory_mb().items():
-            gpu_usage.append((gpu, memory))
-            logger.info(f"GPU {gpu} memory usage MB: {memory}")
+        # peak_cpu_usage = peak_memory_mb()
+        # logger.info(f"Peak CPU memory usage MB: {peak_cpu_usage}")
+        # gpu_usage = []
+        # for gpu, memory in gpu_memory_mb().items():
+        #     gpu_usage.append((gpu, memory))
+        #     logger.info(f"GPU {gpu} memory usage MB: {memory}")
 
         train_loss = 0.0
         # Set the model to "train" mode.
@@ -335,9 +337,9 @@ class Trainer(TrainerBase):
             iter_len = self.accumulated_batch_count \
                 if batches_this_epoch <= (num_training_batches - residue) else residue
 
-            if self.cuda_verbose_step is not None and batch_num_total % self.cuda_verbose_step == 0:
-                print(f'Before forward pass - Cuda memory allocated: {torch.cuda.memory_allocated() / 1e9}')
-                print(f'Before forward pass - Cuda memory cached: {torch.cuda.memory_cached() / 1e9}')
+            # if self.cuda_verbose_step is not None and batch_num_total % self.cuda_verbose_step == 0:
+            #     print(f'Before forward pass - Cuda memory allocated: {torch.cuda.memory_allocated() / 1e9}')
+            #     print(f'Before forward pass - Cuda memory cached: {torch.cuda.memory_cached() / 1e9}')
             try:
                 loss = self.batch_loss(batch_group, for_training=True) / iter_len
             except RuntimeError as e:
@@ -356,27 +358,27 @@ class Trainer(TrainerBase):
                             f"{elem} shape {list(tt.shape)} and min {tt.min().item()} and {tt.max().item()}")
                 raise e
 
-            if self.cuda_verbose_step is not None and batch_num_total % self.cuda_verbose_step == 0:
-                print(f'After forward pass - Cuda memory allocated: {torch.cuda.memory_allocated() / 1e9}')
-                print(f'After forward pass - Cuda memory cached: {torch.cuda.memory_cached() / 1e9}')
+            # if self.cuda_verbose_step is not None and batch_num_total % self.cuda_verbose_step == 0:
+            #     print(f'After forward pass - Cuda memory allocated: {torch.cuda.memory_allocated() / 1e9}')
+            #     print(f'After forward pass - Cuda memory cached: {torch.cuda.memory_cached() / 1e9}')
 
             if torch.isnan(loss):
                 raise ValueError("nan loss encountered")
 
             loss.backward()
 
-            if self.cuda_verbose_step is not None and batch_num_total % self.cuda_verbose_step == 0:
-                print(f'After backprop - Cuda memory allocated: {torch.cuda.memory_allocated() / 1e9}')
-                print(f'After backprop - Cuda memory cached: {torch.cuda.memory_cached() / 1e9}')
+            # if self.cuda_verbose_step is not None and batch_num_total % self.cuda_verbose_step == 0:
+            #     print(f'After backprop - Cuda memory allocated: {torch.cuda.memory_allocated() / 1e9}')
+            #     print(f'After backprop - Cuda memory cached: {torch.cuda.memory_cached() / 1e9}')
 
             train_loss += loss.item() * iter_len
 
             del batch_group, loss
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
 
-            if self.cuda_verbose_step is not None and batch_num_total % self.cuda_verbose_step == 0:
-                print(f'After collecting garbage - Cuda memory allocated: {torch.cuda.memory_allocated() / 1e9}')
-                print(f'After collecting garbage - Cuda memory cached: {torch.cuda.memory_cached() / 1e9}')
+            # if self.cuda_verbose_step is not None and batch_num_total % self.cuda_verbose_step == 0:
+            #     print(f'After collecting garbage - Cuda memory allocated: {torch.cuda.memory_allocated() / 1e9}')
+            #     print(f'After collecting garbage - Cuda memory cached: {torch.cuda.memory_cached() / 1e9}')
 
             batch_grad_norm = self.rescale_gradients()
 
@@ -452,9 +454,9 @@ class Trainer(TrainerBase):
                 )
 
         metrics = training_util.get_metrics(self.model, train_loss, batches_this_epoch, reset=True)
-        metrics["cpu_memory_MB"] = peak_cpu_usage
-        for (gpu_num, memory) in gpu_usage:
-            metrics["gpu_" + str(gpu_num) + "_memory_MB"] = memory
+        # metrics["cpu_memory_MB"] = peak_cpu_usage
+        # for (gpu_num, memory) in gpu_usage:
+        #     metrics["gpu_" + str(gpu_num) + "_memory_MB"] = memory
         return metrics
 
     def _validation_loss(self) -> Tuple[float, int]:
@@ -561,7 +563,7 @@ class Trainer(TrainerBase):
                     metrics["peak_" + key] = max(metrics.get("peak_" + key, 0), value)
 
             # clear cache before validation
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
             if self._validation_data is not None:
                 with torch.no_grad():
                     # We have a validation set, so compute all the metrics on it.
@@ -746,11 +748,11 @@ class Trainer(TrainerBase):
         cls,
         model: Model,
         serialization_dir: str,
-        iterator: DataIterator,
+        iterator: DataLoader,
         train_data: Iterable[Instance],
         validation_data: Optional[Iterable[Instance]],
         params: Params,
-        validation_iterator: DataIterator = None,
+        validation_iterator: DataLoader = None,
     ) -> "Trainer":
 
         patience = params.pop_int("patience", None)
@@ -770,7 +772,7 @@ class Trainer(TrainerBase):
         if model_device >= 0:
             # Moving model to GPU here so that the optimizer state gets constructed on
             # the right device.
-            model = model.cuda(model_device)
+            model = model.to(model_device)
 
         parameters = [[n, p] for n, p in model.named_parameters() if p.requires_grad]
         optimizer = Optimizer.from_params(parameters, params.pop("optimizer"))

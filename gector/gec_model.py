@@ -17,7 +17,7 @@ from gector.bert_token_embedder import PretrainedBertEmbedder
 from gector.seq2labels_model import Seq2Labels
 from gector.tokenizer_indexer import PretrainedBertIndexer
 from utils.helpers import PAD, UNK, get_target_sent_by_edits, START_TOKEN
-from utils.helpers import get_weights_name
+from utils.helpers import get_weights_name, get_gpu_device
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 logger = logging.getLogger(__file__)
@@ -40,7 +40,7 @@ class GecBERTModel(object):
                  resolve_cycles=False,
                  ):
         self.model_weights = list(map(float, weigths)) if weigths else [1] * len(model_paths)
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device, _ = get_gpu_device()
         self.max_len = max_len
         self.min_len = min_len
         self.lowercase_tokens = lowercase_tokens
@@ -88,7 +88,7 @@ class GecBERTModel(object):
             filenames = [input_path]
         for model_path in filenames:
             try:
-                if torch.cuda.is_available():
+                if torch.cuda.is_available() or torch.backends.mps.is_available():
                     loaded_model = torch.load(model_path)
                 else:
                     loaded_model = torch.load(model_path,
@@ -113,7 +113,7 @@ class GecBERTModel(object):
         t11 = time()
         predictions = []
         for batch, model in zip(batches, self.models):
-            batch = util.move_to_device(batch.as_tensor_dict(), 0 if torch.cuda.is_available() else -1)
+            batch = util.move_to_device(batch.as_tensor_dict(), get_gpu_device()[1])
             with torch.no_grad():
                 prediction = model.forward(**batch)
             predictions.append(prediction)

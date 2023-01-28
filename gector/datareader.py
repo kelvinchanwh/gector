@@ -2,7 +2,7 @@
 import logging
 import re
 from random import random
-from typing import Dict, List
+from typing import Dict, List, Iterator
 
 from allennlp.common.file_utils import cached_path
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
@@ -65,7 +65,7 @@ class Seq2LabelsDatasetReader(DatasetReader):
         self._tp_prob = tp_prob
 
     @overrides
-    def _read(self, file_path):
+    def _read(self, file_path) -> Iterator[Instance]:
         # if `file_path` is a URL, redirect to the cache
         file_path = cached_path(file_path)
         with open(file_path, "r") as data_file:

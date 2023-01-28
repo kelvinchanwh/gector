@@ -164,28 +164,28 @@ class Seq2Labels(Model):
             output_dict["words"] = [x["words"] for x in metadata]
         return output_dict
 
-    @overrides
-    def decode(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """
-        Does a simple position-wise argmax over each token, converts indices to string labels, and
-        adds a ``"tags"`` key to the dictionary with the result.
-        """
-        for label_namespace in self.label_namespaces:
-            all_predictions = output_dict[f'class_probabilities_{label_namespace}']
-            all_predictions = all_predictions.cpu().data.numpy()
-            if all_predictions.ndim == 3:
-                predictions_list = [all_predictions[i] for i in range(all_predictions.shape[0])]
-            else:
-                predictions_list = [all_predictions]
-            all_tags = []
+    # @overrides
+    # def decode(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    #     """
+    #     Does a simple position-wise argmax over each token, converts indices to string labels, and
+    #     adds a ``"tags"`` key to the dictionary with the result.
+    #     """
+    #     for label_namespace in self.label_namespaces:
+    #         all_predictions = output_dict[f'class_probabilities_{label_namespace}']
+    #         all_predictions = all_predictions.cpu().data.numpy()
+    #         if all_predictions.ndim == 3:
+    #             predictions_list = [all_predictions[i] for i in range(all_predictions.shape[0])]
+    #         else:
+    #             predictions_list = [all_predictions]
+    #         all_tags = []
 
-            for predictions in predictions_list:
-                argmax_indices = numpy.argmax(predictions, axis=-1)
-                tags = [self.vocab.get_token_from_index(x, namespace=label_namespace)
-                        for x in argmax_indices]
-                all_tags.append(tags)
-            output_dict[f'{label_namespace}'] = all_tags
-        return output_dict
+    #         for predictions in predictions_list:
+    #             argmax_indices = numpy.argmax(predictions, axis=-1)
+    #             tags = [self.vocab.get_token_from_index(x, namespace=label_namespace)
+    #                     for x in argmax_indices]
+    #             all_tags.append(tags)
+    #         output_dict[f'{label_namespace}'] = all_tags
+    #     return output_dict
 
     @overrides
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:

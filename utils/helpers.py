@@ -1,4 +1,5 @@
 import os
+import torch
 from pathlib import Path
 
 
@@ -16,6 +17,20 @@ REPLACEMENTS = {
     "'ve": "' ve",
 }
 
+def get_gpu_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0")
+        if torch.cuda.device_count() > 1:
+            cuda_device = list(range(torch.cuda.device_count()))
+        else:
+            cuda_device = 0
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+        cuda_device = 0
+    else:
+        device = torch.device('cpu')
+        cuda_device = -1
+    return device, cuda_device
 
 def get_verb_form_dicts():
     path_to_dict = os.path.join(VOCAB_DIR, "verb-form-vocab.txt")

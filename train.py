@@ -3,7 +3,10 @@ import os
 from random import seed
 
 import torch
-from allennlp.data.iterators import BucketIterator
+# from torch.utils.data.dataloader import DataLoader
+# from allennlp.data.iterators import BucketIterator
+from allennlp.data.data_loaders import MultiProcessDataLoader
+from allennlp.data.samplers import BucketBatchSampler
 from allennlp.data.vocabulary import DEFAULT_OOV_TOKEN, DEFAULT_PADDING_TOKEN
 from allennlp.data.vocabulary import Vocabulary
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
@@ -13,7 +16,7 @@ from gector.datareader import Seq2LabelsDatasetReader
 from gector.seq2labels_model import Seq2Labels
 from gector.trainer import Trainer
 from gector.tokenizer_indexer import PretrainedBertIndexer
-from utils.helpers import get_weights_name
+from utils.helpers import get_weights_name, get_gpu_device
 
 
 def fix_seed():
@@ -44,9 +47,9 @@ def get_token_embedders(model_name, tune_bert=False, special_tokens_fix=0):
     token_embedders = {'bert': bert_token_emb}
     embedder_to_indexer_map = {"bert": ["bert", "bert-offsets"]}
 
-    text_filed_emd = BasicTextFieldEmbedder(token_embedders=token_embedders,
-                                            embedder_to_indexer_map=embedder_to_indexer_map,
-                                            allow_unmatched_keys=True)
+    text_filed_emd = BasicTextFieldEmbedder(token_embedders=token_embedders) #,
+                                            # embedder_to_indexer_map=embedder_to_indexer_map,
+                                            # allow_unmatched_keys=True)
     return text_filed_emd
 
 
@@ -126,14 +129,16 @@ def main(args):
                       label_smoothing=args.label_smoothing,
                       special_tokens_fix=args.special_tokens_fix)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    if torch.cuda.is_available():
-        if torch.cuda.device_count() > 1:
-            cuda_device = list(range(torch.cuda.device_count()))
-        else:
-            cuda_device = 0
-    else:
-        cuda_device = -1
+    device, cuda_device = get_gpu_device()
+
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # if torch.cuda.is_available():
+    #     if torch.cuda.device_count() > 1:
+    #         cuda_device = list(range(torch.cuda.device_count()))
+    #     else:
+    #         cuda_device = 0
+    # else:
+    #     cuda_device = -1
 
     if args.pretrain:
         model.load_state_dict(
@@ -150,16 +155,30 @@ def main(args):
         optimizer, factor=0.1, patience=10)
     instances_per_epoch = None if not args.updates_per_epoch else \
         int(args.updates_per_epoch * args.batch_size * args.accumulation_size)
-    iterator = BucketIterator(batch_size=args.batch_size,
-                              sorting_keys=[("tokens", "num_tokens")],
-                              biggest_batch_first=True,
-                              max_instances_in_memory=instances_per_epoch,
-                              instances_per_epoch=instances_per_epoch,
-                              )
+    batches_per_epoch = None if not args.updates_per_epoch else \
+        int(args.updates_per_epoch)
+    batchsampler = BucketBatchSampler(batch_size=args.batch_size,
+                              sorting_keys=[("tokens", "num_tokens")])
+    iterator = MultiProcessDataLoader(
+        reader = reader,
+        data_path = args.train_set,
+        # biggest_batch_first=True,
+        max_instances_in_memory=instances_per_epoch,
+        batches_per_epoch=batches_per_epoch,
+        batch_sampler = batchsampler
+        )
+    # iterator = MultiProcessDataLoader(
+    #     reader=,
+    #     data_path=,
+
+    # )
     iterator.index_with(vocab)
-    val_iterator = BucketIterator(batch_size=args.batch_size,
-                                  sorting_keys=[("tokens", "num_tokens")], 
-                                  instances_per_epoch=None)
+    val_iterator = MultiProcessDataLoader(
+        reader = reader,
+        data_path = args.dev_set,
+        batches_per_epoch=None,
+        batch_sampler = batchsampler
+        )
     val_iterator.index_with(vocab)
 
     trainer = Trainer(model=model,
