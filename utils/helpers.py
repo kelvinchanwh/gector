@@ -205,6 +205,10 @@ def get_weights_name(transformer_name, lowercase):
         return 'roberta-base'
     if transformer_name == 'roberta-large':
         return 'roberta-large'
+    if transformer_name == 'xlm-roberta':
+        return 'xlm-roberta-base'
+    if transformer_name == 'xlm-roberta-large':
+        return 'xlm-roberta-large'
     if transformer_name == 'gpt2':
         return 'gpt2'
     if transformer_name == 'transformerxl':
