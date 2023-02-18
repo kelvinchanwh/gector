@@ -135,3 +135,5 @@ dmypy.json
 *.sh
 data/corpus/
 data/corpus
+models/
+errant_env/
