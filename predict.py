@@ -9,6 +9,8 @@ def predict_for_file(input_file, output_file, model, batch_size=32, to_normalize
     predictions = []
     cnt_corrections = 0
     batch = []
+    if args.pre_translate:
+        pass
     for sent in test_data:
         batch.append(sent.split())
         if len(batch) == batch_size:
@@ -88,8 +90,8 @@ if __name__ == '__main__':
                         help='Whether to lowercase tokens.',
                         default=0)
     parser.add_argument('--transformer_model',
-                        choices=['bert', 'gpt2', 'transformerxl', 'xlnet', 'distilbert', 'roberta', 'albert'
-                                 'bert-large', 'roberta-large', 'xlnet-large'],
+                        choices=['bert', 'distilbert', 'gpt2', 'roberta', 'transformerxl', 'xlnet', 'albert',
+                                 'bert-large', 'roberta-large', 'xlnet-large', 'xlm-roberta', 'xlm-roberta-large'],
                         help='Name of the transformer model.',
                         default='roberta')
     parser.add_argument('--iteration_count',
@@ -124,5 +126,9 @@ if __name__ == '__main__':
     parser.add_argument('--normalize',
                         help='Use for text simplification.',
                         action='store_true')
+    parser.add_argument('--pre_translate',
+                        type=int,
+                        help='Whether to translate the code-switched sentences to English before evaluating on model.',
+                        default=0)
     args = parser.parse_args()
     main(args)
