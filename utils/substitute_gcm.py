@@ -144,7 +144,7 @@ def sub_cs(m2, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'ra
 
 		# translate the selected phrase
 		try:
-			translation = retry(translator.translate(phrase_to_translate, src=src_lang, dest=tgt_lang), ex_type=httpcore._exceptions.ReadTimeout, limit=10, wait_ms=100, wait_increase_ratio=2, logger=None)
+			translation = retry(translator.translate(phrase_to_translate, src=src_lang, dest=tgt_lang), ex_type=httpcore._exceptions.ReadTimeout, limit=10, wait_ms=100, wait_increase_ratio=10, logger=None)
 		except httpcore._exceptions.ReadTimeout:
 			print ("Timeout Error - Sentence: {}".format(" ".join(sentence)))
 			# Return original sentence
@@ -165,34 +165,43 @@ def sub_cs(m2, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'ra
 		return (sentence, [False]*len(sentence), -1, -1)
 	
 def main(args):
-	pid = args[0]
-	in_m2 = args[1]
-	# download and load the Benepar model
-	# benepar.download('benepar_en3')
-	parser = benepar.Parser('benepar_en3')
+	try:
+		pid = args[0]
+		in_m2 = args[1]
+		input_path = args[2]
+		with open(input_path + ".p" + str(pid) + ".src", "w+") as src_cache, open(input_path + ".p" + str(pid) + ".src", "w+") as tgt_cache:
+			# download and load the Benepar model
+			# benepar.download('benepar_en3')
+			parser = benepar.Parser('benepar_en3')
 
-	# create a translator object
-	translator = Translator()
-	output = list()
-	tqdm_text = "Batch #" + "{}".format(pid).zfill(3)
-	for sentence in tqdm(in_m2, desc=tqdm_text, position=pid+1):
-		cs_words, cs_list, start, end = sub_cs(sentence, parser, translator)
-		
-		if max([m2_edit[0][1] for m2_edit in sentence["edits"]]) <= len(cs_list):
-			incorr = apply_edit_to_cs(cs_words, cs_list, sentence["edits"])
+			# create a translator object
+			translator = Translator()
+			output = list()
+			tqdm_text = "Batch #" + "{}".format(pid).zfill(3)
+			for sentence in in_m2: # tqdm(in_m2, desc=tqdm_text, position=pid+1):
+				try:
+					cs_words, cs_list, start, end = sub_cs(sentence, parser, translator)
+					
+					if max([m2_edit[0][1] for m2_edit in sentence["edits"]]) <= len(cs_list):
+						incorr = apply_edit_to_cs(cs_words, cs_list, sentence["edits"])
 
-			corr = [i for i in cs_words if i != "<CS_FILL>"]
-			incorr = [i for i in incorr if i != "<CS_FILL>"]
+						corr = [i for i in cs_words if i != "<CS_FILL>"]
+						incorr = [i for i in incorr if i != "<CS_FILL>"]
 
-			corr = " ".join(corr)
-			incorr = " ".join(incorr)
+						corr = " ".join(corr)
+						incorr = " ".join(incorr)
 
-			output.append((incorr, corr))
-			# output_cs_incorr.write(incorr + '\n')
-			# output_cs_corr.write(corr + '\n')
-		else:
-			print ("Sentence is shorter than m2 edit")
-	return output
+						output.append((incorr, corr))
+						src_cache.write(incorr + '\n')
+						tgt_cache.write(corr + '\n')
+					else:
+						print ("Sentence is shorter than m2 edit")
+				except Exception as e:
+					print (e)
+					print ("ERROR processing sentence: {}".format(sentence))
+		return output
+	except Exception as e:
+		print (e)
 
 if __name__ == "__main__":
 	if len(sys.argv) != 4:
@@ -214,7 +223,7 @@ if __name__ == "__main__":
 		print ("Total {} Chunks".format(len(chunks)))
 		with multiprocessing.Pool(processes=cpu_count, initargs=(multiprocessing.RLock(),), initializer=tqdm.set_lock) as pool:
 			# Pool(processes=num_processes, initargs=(RLock(),), initializer=tqdm.set_lock)
-			results = pool.map(main, [(i, n) for i, n in enumerate(chunks)])
+			results = pool.map(main, [(i, n, input_path) for i, n in enumerate(chunks)])
 		for result in results:
 			for ret in result:
 				output_cs_incorr.write(ret[0] + '\n')
