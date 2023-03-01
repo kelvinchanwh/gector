@@ -6,3 +6,9 @@ scikit-learn==0.20.0
 sentencepiece==0.1.95
 overrides==4.1.2
 numpy==1.19.5
+
+tqdm==4.64.1
+googletrans==3.1.0a0 #Google Translate
+jieba==0.42.1 #Chinese Tokenization
+nagisa==0.2.8 #Japanese Tokenization
+konlpy==0.6.0 # Korean Tokenization
