@@ -6,6 +6,13 @@ from tqdm import tqdm
 import time
 import httpcore
 import multiprocessing
+import platform
+
+def divide_chunks(l, n):
+    # looping till length l
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+	
 
 def retry(func, ex_type=Exception, limit=0, wait_ms=100, wait_increase_ratio=2, logger=None):
     """
@@ -157,22 +164,35 @@ def sub_cs(m2, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'ra
 	else:
 		return (sentence, [False]*len(sentence), -1, -1)
 	
-def main(in_m2, parser, translator):
-	cs_words, cs_list, start, end = sub_cs(in_m2, parser, translator)
-	
-	if max([m2_edit[0][1] for m2_edit in in_m2["edits"]]) <= len(cs_list):
-		incorr = apply_edit_to_cs(cs_words, cs_list, in_m2["edits"])
+def main(args):
+	pid = args[0]
+	in_m2 = args[1]
+	# download and load the Benepar model
+	# benepar.download('benepar_en3')
+	parser = benepar.Parser('benepar_en3')
 
-		corr = [i for i in cs_words if i != "<CS_FILL>"]
-		incorr = [i for i in incorr if i != "<CS_FILL>"]
+	# create a translator object
+	translator = Translator()
+	output = list()
+	tqdm_text = "Batch #" + "{}".format(pid).zfill(3)
+	for sentence in tqdm(in_m2, desc=tqdm_text, position=pid+1):
+		cs_words, cs_list, start, end = sub_cs(sentence, parser, translator)
+		
+		if max([m2_edit[0][1] for m2_edit in sentence["edits"]]) <= len(cs_list):
+			incorr = apply_edit_to_cs(cs_words, cs_list, sentence["edits"])
 
-		corr = " ".join(corr)
-		incorr = " ".join(incorr)
+			corr = [i for i in cs_words if i != "<CS_FILL>"]
+			incorr = [i for i in incorr if i != "<CS_FILL>"]
 
-		output_cs_incorr.write(incorr + '\n')
-		output_cs_corr.write(corr + '\n')
-	else:
-		print ("Sentence is shorter than m2 edit")
+			corr = " ".join(corr)
+			incorr = " ".join(incorr)
+
+			output.append((incorr, corr))
+			# output_cs_incorr.write(incorr + '\n')
+			# output_cs_corr.write(corr + '\n')
+		else:
+			print ("Sentence is shorter than m2 edit")
+	return output
 
 if __name__ == "__main__":
 	if len(sys.argv) != 4:
@@ -184,15 +204,18 @@ if __name__ == "__main__":
 	output_cs_incorr_path = sys.argv[2]
 	output_cs_corr_path = sys.argv[3]
 
-	# download and load the Benepar model
-	# benepar.download('benepar_en3')
-	parser = benepar.Parser('benepar_en3')
-
-	# create a translator object
-	translator = Translator()
+	if platform.system() == "Darwin":
+		multiprocessing.set_start_method('spawn')
 
 	with open(output_cs_incorr_path, "w+") as output_cs_incorr, open(output_cs_corr_path, "w+") as output_cs_corr:
 		in_m2  = parse_m2(input_path)
-		for sentence in tqdm(in_m2.values()):
-			main(sentence, parser, translator)
-
+		cpu_count = multiprocessing.cpu_count()
+		chunks = list(divide_chunks(list(in_m2.values()), int((len(in_m2)/cpu_count)+1)))
+		print ("Total {} Chunks".format(len(chunks)))
+		with multiprocessing.Pool(processes=cpu_count, initargs=(multiprocessing.RLock(),), initializer=tqdm.set_lock) as pool:
+			# Pool(processes=num_processes, initargs=(RLock(),), initializer=tqdm.set_lock)
+			results = pool.map(main, [(i, n) for i, n in enumerate(chunks)])
+		for result in results:
+			for ret in result:
+				output_cs_incorr.write(ret[0] + '\n')
+				output_cs_corr.write(ret[1] + '\n')
