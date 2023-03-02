@@ -111,9 +111,8 @@ def parse_m2(input_m2_path):
 	return m2_dict
 
 
-def sub_cs(m2, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'random', verbose = False):
+def sub_cs(sentence, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'random', verbose = False):
 	# parse the sentence using Benepar
-	sentence = m2["corr"]
 	tree = parser.parse(sentence)
 
 	for idx, _ in enumerate(tree.leaves()):
@@ -148,7 +147,7 @@ def sub_cs(m2, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'ra
 		except httpcore._exceptions.ReadTimeout:
 			print ("Timeout Error - Sentence: {}".format(" ".join(sentence)))
 			# Return original sentence
-			return (sentence, [False]*len(sentence), -1, -1)
+			return (sentence, [False]*len(sentence))
 		translation = translation.text
 		# replace the selected phrase with its translation
 		new_sentence = sentence[:start] + [translation] + ["<CS_FILL>"]*(end-start-1) + sentence[end:]
@@ -160,9 +159,9 @@ def sub_cs(m2, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'ra
 			print(f"Translated sentence: {new_sentence}")
 			print(f"Translated span: ({start}, {end})")
 
-		return (new_sentence, cs_list, start, end)
+		return (new_sentence, cs_list)
 	else:
-		return (sentence, [False]*len(sentence), -1, -1)
+		return (sentence, [False]*len(sentence))
 	
 def main(args):
 	try:
@@ -180,7 +179,27 @@ def main(args):
 			tqdm_text = "Batch #" + "{}".format(pid).zfill(3)
 			for sentence in in_m2: # tqdm(in_m2, desc=tqdm_text, position=pid+1):
 				try:
-					cs_words, cs_list, start, end = sub_cs(sentence, parser, translator)
+					if len(sentence["corr"]) > 100:
+						# Sentence too long, may cause issues with parser
+						# Split sentences
+						cs_words = []
+						cs_list = []
+						current_words = []
+						current_list = []
+						for token in sentence["corr"]:
+							current_words.append(token)
+							if token == ".":
+								current_words.append(token)
+								current_words, current_list = sub_cs(current_words, parser, translator)
+								cs_words += current_words
+								cs_list += current_list
+								current_words = []
+						if current_words:
+							current_words, current_list = sub_cs(current_words, parser, translator)
+							cs_words += current_words
+							cs_list += current_list
+					else:
+						cs_words, cs_list = sub_cs(sentence["corr"], parser, translator)
 					
 					if max([m2_edit[0][1] for m2_edit in sentence["edits"]]) <= len(cs_list):
 						incorr = apply_edit_to_cs(cs_words, cs_list, sentence["edits"])
@@ -198,6 +217,7 @@ def main(args):
 						print ("Sentence is shorter than m2 edit")
 				except Exception as e:
 					print (e)
+					print (len(sentence["corr"]))
 					print ("ERROR processing sentence: {}".format(sentence))
 		return output
 	except Exception as e:
