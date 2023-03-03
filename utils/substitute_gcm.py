@@ -110,6 +110,14 @@ def parse_m2(input_m2_path):
 				m2_dict[S]["edits"].append(info)
 	return m2_dict
 
+def select_least_intersect(cs_intervals, edits):
+    def interval_intersection(a, b):
+        return max(0, min(a[1], b[1]) - max(a[0], b[0]))
+    
+    def total_intersection(interval, intervals):
+        return sum(interval_intersection(interval, other) for other in intervals)
+    
+    return min(cs_intervals, key=lambda interval: total_intersection(interval, edits))
 
 def sub_cs(sentence, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'random', verbose = False):
 	# parse the sentence using Benepar
@@ -138,7 +146,9 @@ def sub_cs(sentence, parser, translator, src_lang="en", tgt_lang="zh-tw", select
 		if select == 'random':
 			# randomly select a phrase to translate
 			phrase_to_translate, start, end = random.choice(phrases)
-		
+		elif select == 'intersect':
+			phrase_to_translate, start, end = select_least_intersect(phrases, m2)
+
 		sentence = [leaf.split("|:::|")[0] for leaf in tree.leaves()]
 
 		# translate the selected phrase
@@ -189,7 +199,6 @@ def main(args):
 						for token in sentence["corr"]:
 							current_words.append(token)
 							if token == ".":
-								current_words.append(token)
 								current_words, current_list = sub_cs(current_words, parser, translator)
 								cs_words += current_words
 								cs_list += current_list
