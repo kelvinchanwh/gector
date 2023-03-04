@@ -110,7 +110,7 @@ def parse_m2(input_m2_path):
 				m2_dict[S]["edits"].append(info)
 	return m2_dict
 
-def select_least_intersect(phrases, edit_intervals):
+def select_least_intersect(phrases, edit_intervals, sent_len):
 	def interval_intersection(a, b):
 		return max(0, min(a[1], b[1]) - max(a[0], b[0]))
 	
@@ -123,7 +123,16 @@ def select_least_intersect(phrases, edit_intervals):
 		
 		return max(least_intersecting_phrases, key=lambda phrase: phrase[2] - phrase[1])
 	else:
-		return random.choice(phrases) 
+		# 15% code-switching ratio based on reference CS
+		# >>> frac_std_mean.main("rcm_lang_tagged_zh.txt", ["EN", "ZH"])
+		# (0.8458093800319865, 0.13028245915220268)
+		# >>> frac_std_mean.main("rcm_lang_tagged_ko.txt", ["EN", "KO"])
+		# (0.7961622654916878, 0.16734657894380928)
+		# >>> frac_std_mean.main("rcm_lang_tagged_ja.txt", ["EN", "JA"])
+		# (0.734999068414355, 0.16464834557312077)
+		cs_ratio = sent_len * 0.15
+		# Return phrase closest to cs_ratio
+		return min(phrases, key = lambda phrase: abs(phrase[2]-phrase[1]-cs_ratio))
 
 def sub_cs(sentence, parser, translator, edits=None, src_lang="en", tgt_lang="zh-tw", select = 'random', verbose = False):
 	# parse the sentence using Benepar
@@ -154,7 +163,7 @@ def sub_cs(sentence, parser, translator, edits=None, src_lang="en", tgt_lang="zh
 			phrase_to_translate, start, end = random.choice(phrases)
 		elif select == 'intersect' and (edits is not None):
 			edit_spans = [(edit[0][0], edit[0][1]) for edit in edits if edit[0][0]!=-1]
-			phrase_to_translate, start, end = select_least_intersect(phrases, edit_spans)
+			phrase_to_translate, start, end = select_least_intersect(phrases, edit_spans, len(sentence))
 		else:
 			print ("M2 edits much be provided for intersect selection method")
 
