@@ -147,7 +147,7 @@ def sub_cs(sentence, parser, translator, edits=None, src_lang="en", tgt_lang="zh
 			# randomly select a phrase to translate
 			phrase_to_translate, start, end = random.choice(phrases)
 		elif select == 'intersect' and (edits is not None):
-			edit_spans = [(edit[1], edit[2]) for edit in edits if edit[1]!=-1]
+			edit_spans = [(edit[0][0], edit[0][1]) for edit in edits if edit[0][0]!=-1]
 			phrase_to_translate, start, end = select_least_intersect(phrases, edit_spans)
 		else:
 			print ("M2 edits much be provided for intersect selection method")
@@ -217,7 +217,7 @@ def main(args):
 							cs_words += current_words
 							cs_list += current_list
 					else:
-						cs_words, cs_list = sub_cs(sentence["corr"], parser, translator, edits=sentence["edits"], src_lang=src_lang, tgt_lang=tgt_lang, select = "random")
+						cs_words, cs_list = sub_cs(sentence["corr"], parser, translator, edits=sentence["edits"], src_lang=src_lang, tgt_lang=tgt_lang, select=selection)
 					
 					if max([m2_edit[0][1] for m2_edit in sentence["edits"]]) <= len(cs_list):
 						incorr = apply_edit_to_cs(cs_words, cs_list, sentence["edits"])
