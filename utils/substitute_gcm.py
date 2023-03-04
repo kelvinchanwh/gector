@@ -9,43 +9,43 @@ import multiprocessing
 import platform
 
 def divide_chunks(l, n):
-    # looping till length l
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
+	# looping till length l
+	for i in range(0, len(l), n):
+		yield l[i:i + n]
 	
 
 def retry(func, ex_type=Exception, limit=0, wait_ms=100, wait_increase_ratio=2, logger=None):
-    """
-    Retry a function invocation until no exception occurs
-    :param func: function to invoke
-    :param ex_type: retry only if exception is subclass of this type
-    :param limit: maximum number of invocation attempts
-    :param wait_ms: initial wait time after each attempt in milliseconds.
-    :param wait_increase_ratio: increase wait period by multiplying this value after each attempt.
-    :param logger: if not None, retry attempts will be logged to this logging.logger
-    :return: result of first successful invocation
-    :raises: last invocation exception if attempts exhausted or exception is not an instance of ex_type
-    """
-    attempt = 1
-    while True:
-        try:
-            return func
-        except Exception as ex:
-            if not isinstance(ex, ex_type):
-                raise ex
-            if 0 < limit <= attempt:
-                if logger:
-                    logger.warning("no more attempts")
-                raise ex
+	"""
+	Retry a function invocation until no exception occurs
+	:param func: function to invoke
+	:param ex_type: retry only if exception is subclass of this type
+	:param limit: maximum number of invocation attempts
+	:param wait_ms: initial wait time after each attempt in milliseconds.
+	:param wait_increase_ratio: increase wait period by multiplying this value after each attempt.
+	:param logger: if not None, retry attempts will be logged to this logging.logger
+	:return: result of first successful invocation
+	:raises: last invocation exception if attempts exhausted or exception is not an instance of ex_type
+	"""
+	attempt = 1
+	while True:
+		try:
+			return func
+		except Exception as ex:
+			if not isinstance(ex, ex_type):
+				raise ex
+			if 0 < limit <= attempt:
+				if logger:
+					logger.warning("no more attempts")
+				raise ex
 
-            if logger:
-                logger.error("failed execution attempt #%d", attempt, exc_info=ex)
+			if logger:
+				logger.error("failed execution attempt #%d", attempt, exc_info=ex)
 
-            attempt += 1
-            if logger:
-                logger.info("waiting %d ms before attempt #%d", wait_ms, attempt)
-            time.sleep(wait_ms / 1000)
-            wait_ms *= wait_increase_ratio
+			attempt += 1
+			if logger:
+				logger.info("waiting %d ms before attempt #%d", wait_ms, attempt)
+			time.sleep(wait_ms / 1000)
+			wait_ms *= wait_increase_ratio
 
 
 def apply_edit_to_cs(cs_words, cs_list, m2_edits):
@@ -111,13 +111,17 @@ def parse_m2(input_m2_path):
 	return m2_dict
 
 def select_least_intersect(phrases, edit_intervals):
-    def interval_intersection(a, b):
-        return max(0, min(a[1], b[1]) - max(a[0], b[0]))
-    
-    def total_intersection(cs_interval, edit_interval):
-        return sum(interval_intersection(cs_interval, other) for other in edit_interval)
-    
-    return min(phrases, key=lambda interval: total_intersection((interval[1], interval[2]), edit_intervals))
+	def interval_intersection(a, b):
+		return max(0, min(a[1], b[1]) - max(a[0], b[0]))
+	
+	def total_intersection(cs_interval, edit_interval):
+		return sum(interval_intersection(cs_interval, other) for other in edit_interval)
+	
+	intersections = [total_intersection((interval[1], interval[2]), edit_intervals) for interval in phrases]
+	min_intersection = min(intersections)
+	least_intersecting_phrases = [phrases[i] for i in range(len(intersections)) if intersections[i]==min_intersection]
+	
+	return max(least_intersecting_phrases, key=lambda phrase: phrase[2] - phrase[1])
 
 def sub_cs(sentence, parser, translator, edits=None, src_lang="en", tgt_lang="zh-tw", select = 'random', verbose = False):
 	# parse the sentence using Benepar
