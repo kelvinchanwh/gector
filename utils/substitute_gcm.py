@@ -116,12 +116,14 @@ def select_least_intersect(phrases, edit_intervals):
 	
 	def total_intersection(cs_interval, edit_interval):
 		return sum(interval_intersection(cs_interval, other) for other in edit_interval)
-	
-	intersections = [total_intersection((interval[1], interval[2]), edit_intervals) for interval in phrases]
-	min_intersection = min(intersections)
-	least_intersecting_phrases = [phrases[i] for i in range(len(intersections)) if intersections[i]==min_intersection]
-	
-	return max(least_intersecting_phrases, key=lambda phrase: phrase[2] - phrase[1])
+	if len(edit_intervals) == 0:
+		intersections = [total_intersection((interval[1], interval[2]), edit_intervals) for interval in phrases]
+		min_intersection = min(intersections)
+		least_intersecting_phrases = [phrases[i] for i in range(len(intersections)) if intersections[i]==min_intersection]
+		
+		return max(least_intersecting_phrases, key=lambda phrase: phrase[2] - phrase[1])
+	else:
+		return random.choice(phrases) 
 
 def sub_cs(sentence, parser, translator, edits=None, src_lang="en", tgt_lang="zh-tw", select = 'random', verbose = False):
 	# parse the sentence using Benepar
