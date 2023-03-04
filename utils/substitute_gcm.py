@@ -110,16 +110,16 @@ def parse_m2(input_m2_path):
 				m2_dict[S]["edits"].append(info)
 	return m2_dict
 
-def select_least_intersect(cs_intervals, edits):
+def select_least_intersect(phrases, edit_intervals):
     def interval_intersection(a, b):
         return max(0, min(a[1], b[1]) - max(a[0], b[0]))
     
-    def total_intersection(interval, intervals):
-        return sum(interval_intersection(interval, other) for other in intervals)
+    def total_intersection(cs_interval, edit_interval):
+        return sum(interval_intersection(cs_interval, other) for other in edit_interval)
     
-    return min(cs_intervals, key=lambda interval: total_intersection(interval, edits))
+    return min(phrases, key=lambda interval: total_intersection((interval[1], interval[2]), edit_intervals))
 
-def sub_cs(sentence, parser, translator, src_lang="en", tgt_lang="zh-tw", select = 'random', verbose = False):
+def sub_cs(sentence, parser, translator, edits=None, src_lang="en", tgt_lang="zh-tw", select = 'random', verbose = False):
 	# parse the sentence using Benepar
 	tree = parser.parse(sentence)
 
@@ -146,8 +146,11 @@ def sub_cs(sentence, parser, translator, src_lang="en", tgt_lang="zh-tw", select
 		if select == 'random':
 			# randomly select a phrase to translate
 			phrase_to_translate, start, end = random.choice(phrases)
-		elif select == 'intersect':
-			phrase_to_translate, start, end = select_least_intersect(phrases, m2)
+		elif select == 'intersect' and (edits is not None):
+			edit_spans = [(edit[1], edit[2]) for edit in edits if edit[1]!=-1]
+			phrase_to_translate, start, end = select_least_intersect(phrases, edit_spans)
+		else:
+			print ("M2 edits much be provided for intersect selection method")
 
 		sentence = [leaf.split("|:::|")[0] for leaf in tree.leaves()]
 
@@ -178,6 +181,9 @@ def main(args):
 		pid = args[0]
 		in_m2 = args[1]
 		input_path = args[2]
+		src_lang = args[3]
+		tgt_lang = args[4]
+		selection = args[5]
 		with open(input_path + ".p" + str(pid) + ".src", "w+") as src_cache, open(input_path + ".p" + str(pid) + ".src", "w+") as tgt_cache:
 			# download and load the Benepar model
 			# benepar.download('benepar_en3')
@@ -192,6 +198,7 @@ def main(args):
 					if len(sentence["corr"]) > 100:
 						# Sentence too long, may cause issues with parser
 						# Split sentences
+						# TODO: Implement intersection for split sentences
 						cs_words = []
 						cs_list = []
 						current_words = []
@@ -199,16 +206,18 @@ def main(args):
 						for token in sentence["corr"]:
 							current_words.append(token)
 							if token == ".":
-								current_words, current_list = sub_cs(current_words, parser, translator)
+								# Selection method will default to random to avoid needing to pass in m2
+								current_words, current_list = sub_cs(current_words, parser, translator, src_lang=src_lang, tgt_lang=tgt_lang, select = "random")
 								cs_words += current_words
 								cs_list += current_list
 								current_words = []
+								current_list = []
 						if current_words:
-							current_words, current_list = sub_cs(current_words, parser, translator)
+							current_words, current_list = sub_cs(current_words, parser, translator, src_lang=src_lang, tgt_lang=tgt_lang, select = "random")
 							cs_words += current_words
 							cs_list += current_list
 					else:
-						cs_words, cs_list = sub_cs(sentence["corr"], parser, translator)
+						cs_words, cs_list = sub_cs(sentence["corr"], parser, translator, edits=sentence["edits"], src_lang=src_lang, tgt_lang=tgt_lang, select = "random")
 					
 					if max([m2_edit[0][1] for m2_edit in sentence["edits"]]) <= len(cs_list):
 						incorr = apply_edit_to_cs(cs_words, cs_list, sentence["edits"])
@@ -233,14 +242,17 @@ def main(args):
 		print (e)
 
 if __name__ == "__main__":
-	if len(sys.argv) != 4:
-		print("[USAGE] %s input_inv_m2_file output_cs_incorr output_cs_corr" % sys.argv[0])
+	if len(sys.argv) != 7:
+		print("[USAGE] %s input_inv_m2_file output_cs_incorr output_cs_corr src_lang tgt_lang select" % sys.argv[0])
 		sys.exit()
 
 	# define a sentence to parse and translate
 	input_path = sys.argv[1]
 	output_cs_incorr_path = sys.argv[2]
 	output_cs_corr_path = sys.argv[3]
+	src_lang = sys.argv[4]
+	tgt_lang = sys.argv[5]
+	selection = sys.argv[6]
 
 	if platform.system() == "Darwin":
 		multiprocessing.set_start_method('spawn')
@@ -252,7 +264,7 @@ if __name__ == "__main__":
 		print ("Total {} Chunks".format(len(chunks)))
 		with multiprocessing.Pool(processes=cpu_count, initargs=(multiprocessing.RLock(),), initializer=tqdm.set_lock) as pool:
 			# Pool(processes=num_processes, initargs=(RLock(),), initializer=tqdm.set_lock)
-			results = pool.map(main, [(i, n, input_path) for i, n in enumerate(chunks)])
+			results = pool.map(main, [(i, n, input_path, src_lang, tgt_lang, selection) for i, n in enumerate(chunks)])
 		for result in results:
 			for ret in result:
 				output_cs_incorr.write(ret[0] + '\n')
