@@ -132,7 +132,6 @@ dmypy.json
 # PyCharm
 .idea
 
-*.sh
 data/corpus/
 data/corpus
 models/
