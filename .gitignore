@@ -137,3 +137,6 @@ data/corpus/
 data/corpus
 models/
 errant_env/
+
+machine.file.*
+slurm*
