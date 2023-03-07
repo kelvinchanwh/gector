@@ -35,43 +35,34 @@ def get_verb_form_dicts():
 ENCODE_VERB_DICT, DECODE_VERB_DICT = get_verb_form_dicts()
 
 
-def get_target_sent_by_edits(source_tokens, cs_list, ori_list, edits):
+def get_target_sent_by_edits(source_tokens, edits):
     target_tokens = source_tokens[:]
-    target_cs_list = cs_list[:]
-    target_ori_list = ori_list[:]
     shift_idx = 0
     for edit in edits:
         start, end, label, _ = edit
-        if (start==end) or max(cs_list[start:end]) == 0:
-            # Only apply edit if not within cs span
-            target_pos = start + shift_idx
-            source_token = target_tokens[target_pos] \
-                if len(target_tokens) > target_pos >= 0 else ''
-            if label == "":
-                del target_tokens[target_pos]
-                del target_cs_list[target_pos]
-                del target_ori_list[target_pos]
-                shift_idx -= 1
-            elif start == end:
-                word = label.replace("$APPEND_", "")
-                target_tokens[target_pos: target_pos] = [word]
-                target_cs_list[target_pos: target_pos] = [False]
-                target_ori_list[target_pos: target_pos] = [word]
-                shift_idx += 1
-            elif label.startswith("$TRANSFORM_"):
-                word = apply_reverse_transformation(source_token, label)
-                if word is None:
-                    word = source_token
-                target_tokens[target_pos] = word
-            elif start == end - 1:
-                word = label.replace("$REPLACE_", "")
-                target_tokens[target_pos] = word
-            elif label.startswith("$MERGE_"):
-                target_tokens[target_pos + 1: target_pos + 1] = [label]
-                # target_cs_list[target_pos + 1: target_pos + 1] = [False]
-                shift_idx += 1
+        target_pos = start + shift_idx
+        source_token = target_tokens[target_pos] \
+            if len(target_tokens) > target_pos >= 0 else ''
+        if label == "":
+            del target_tokens[target_pos]
+            shift_idx -= 1
+        elif start == end:
+            word = label.replace("$APPEND_", "")
+            target_tokens[target_pos: target_pos] = [word]
+            shift_idx += 1
+        elif label.startswith("$TRANSFORM_"):
+            word = apply_reverse_transformation(source_token, label)
+            if word is None:
+                word = source_token
+            target_tokens[target_pos] = word
+        elif start == end - 1:
+            word = label.replace("$REPLACE_", "")
+            target_tokens[target_pos] = word
+        elif label.startswith("$MERGE_"):
+            target_tokens[target_pos + 1: target_pos + 1] = [label]
+            shift_idx += 1
 
-    return (replace_merge_transforms(target_tokens), target_cs_list, target_ori_list)
+    return replace_merge_transforms(target_tokens)
 
 
 def replace_merge_transforms(tokens):
@@ -244,42 +235,3 @@ def normalize(sent):
     for fr, to in REPLACEMENTS.items():
         sent = sent.replace(fr, to)
     return sent.lower()
-
-def divide_chunks(l, n):
-	# looping till length l
-	for i in range(0, len(l), n):
-		yield l[i:i + n]
-	
-
-def retry(func, ex_type=Exception, limit=0, wait_ms=100, wait_increase_ratio=2, logger=None):
-	"""
-	Retry a function invocation until no exception occurs
-	:param func: function to invoke
-	:param ex_type: retry only if exception is subclass of this type
-	:param limit: maximum number of invocation attempts
-	:param wait_ms: initial wait time after each attempt in milliseconds.
-	:param wait_increase_ratio: increase wait period by multiplying this value after each attempt.
-	:param logger: if not None, retry attempts will be logged to this logging.logger
-	:return: result of first successful invocation
-	:raises: last invocation exception if attempts exhausted or exception is not an instance of ex_type
-	"""
-	attempt = 1
-	while True:
-		try:
-			return func
-		except Exception as ex:
-			if not isinstance(ex, ex_type):
-				raise ex
-			if 0 < limit <= attempt:
-				if logger:
-					logger.warning("no more attempts")
-				raise ex
-
-			if logger:
-				logger.error("failed execution attempt #%d", attempt, exc_info=ex)
-
-			attempt += 1
-			if logger:
-				logger.info("waiting %d ms before attempt #%d", wait_ms, attempt)
-			time.sleep(wait_ms / 1000)
-			wait_ms *= wait_increase_ratio
