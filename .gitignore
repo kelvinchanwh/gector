@@ -136,6 +136,7 @@ data/corpus/
 data/corpus
 models/
 errant_env/
+results/
 
 machine.file.*
 slurm*
