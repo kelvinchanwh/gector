@@ -91,7 +91,7 @@ if __name__ == '__main__':
                         default=0)
     parser.add_argument('--transformer_model',
                         choices=['bert', 'distilbert', 'gpt2', 'roberta', 'transformerxl', 'xlnet', 'albert',
-                                 'bert-large', 'roberta-large', 'xlnet-large', 'xlm-roberta', 'xlm-roberta-large'],
+                                 'bert-large', 'roberta-large', 'xlnet-large', 'xlm-roberta', 'xlm-roberta-large', 'mdeberta-v3-base'],
                         help='Name of the transformer model.',
                         default='roberta')
     parser.add_argument('--iteration_count',
