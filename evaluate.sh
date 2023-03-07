@@ -26,7 +26,7 @@ fi
 
 source errant_env/bin/activate
 
-echo $1 > results/results.$1.txt
+echo $1 > results/results.$2.$1.txt
 
 if [ -f data/corpus/eval/lang8/lang8.en.$2.$1.hyp.txt ]
 then
