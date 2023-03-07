@@ -35,8 +35,8 @@ eval errant_compare -hyp data/corpus/eval/annotated/annotated.en.$2.$1.hyp.m2 -r
 echo "\"Annotated CS\"    $2    Span    GED" >> results.$2.$1.txt
 eval errant_compare -hyp data/corpus/eval/annotated/annotated.en.$2.$1.hyp.m2 -ref data/corpus/eval/annotated/annotated.en.$2.m2 -cat 3 -ds >> results.$2.$1.txt
 
-echo "\"BEA-19 Dev\"    $2    Span    GEC" >> results.$2.$1.txt
-eval errant_compare -hyp data/corpus/eval/bea19/bea19.dev.en.$1.hyp.m2 -ref data/corpus/eval/bea19/bea19.dev.en.$2.m2 -cat 3 >> results.$2.$1.txt
+echo "\"BEA-19 Dev\"    EN    Span    GEC" >> results.$2.$1.txt
+eval errant_compare -hyp data/corpus/eval/bea19/bea19.dev.en.$1.hyp.m2 -ref data/corpus/eval/bea19/bea19.dev.en.m2 -cat 3 >> results.$2.$1.txt
 
-echo "\"BEA-19 Dev\"    $2    Span    GED" >> results.$2.$1.txt
-eval errant_compare -hyp data/corpus/eval/bea19/bea19.dev.en.$2.$1.hyp.m2 -ref data/corpus/eval/bea19/bea19.dev.en.$2.m2 -cat 3 -ds >> results.$2.$1.txt
+echo "\"BEA-19 Dev\"    EN    Span    GED" >> results.$2.$1.txt
+eval errant_compare -hyp data/corpus/eval/bea19/bea19.dev.en.$1.hyp.m2 -ref data/corpus/eval/bea19/bea19.dev.en.m2 -cat 3 -ds >> results.$2.$1.txt
